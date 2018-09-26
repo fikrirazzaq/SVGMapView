@@ -1,21 +1,5 @@
 package com.jiahuan.svgmapview.core.helper.map;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.StringTokenizer;
-import java.util.regex.Pattern;
-
-import javax.xml.parsers.SAXParser;
-import javax.xml.parsers.SAXParserFactory;
-
-import org.xml.sax.Attributes;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXNotRecognizedException;
-import org.xml.sax.XMLReader;
-import org.xml.sax.helpers.DefaultHandler;
-
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.DashPathEffect;
@@ -28,8 +12,20 @@ import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Shader.TileMode;
-import android.util.FloatMath;
 import android.util.Log;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.StringTokenizer;
+import java.util.regex.Pattern;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXNotRecognizedException;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements. See the NOTICE
@@ -593,407 +589,6 @@ public class SVGParser
 	private static final Matrix arcMatrix = new Matrix();
 	private static final Matrix arcMatrix2 = new Matrix();
 
-	private static void drawArc(Path p, float lastX, float lastY, float x, float y, float rx, float ry, float theta, int largeArc, int sweepArc)
-	{
-		// Log.d("drawArc", "from (" + lastX + "," + lastY + ") to (" + x + ","+
-		// y + ") r=(" + rx + "," + ry +
-		// ") theta=" + theta + " flags="+ largeArc + "," + sweepArc);
-
-		// http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
-
-		if (rx == 0 || ry == 0)
-		{
-			p.lineTo(x, y);
-			return;
-		}
-
-		if (x == lastX && y == lastY)
-		{
-			return; // nothing to draw
-		}
-
-		rx = Math.abs(rx);
-		ry = Math.abs(ry);
-
-		final float thrad = theta * (float) Math.PI / 180;
-		final float st = FloatMath.sin(thrad);
-		final float ct = FloatMath.cos(thrad);
-
-		final float xc = (lastX - x) / 2;
-		final float yc = (lastY - y) / 2;
-		final float x1t = ct * xc + st * yc;
-		final float y1t = -st * xc + ct * yc;
-
-		final float x1ts = x1t * x1t;
-		final float y1ts = y1t * y1t;
-		float rxs = rx * rx;
-		float rys = ry * ry;
-
-		float lambda = (x1ts / rxs + y1ts / rys) * 1.001f; // add 0.1% to be
-															// sure that no out
-															// of range occurs
-															// due to
-															// limited precision
-		if (lambda > 1)
-		{
-			float lambdasr = FloatMath.sqrt(lambda);
-			rx *= lambdasr;
-			ry *= lambdasr;
-			rxs = rx * rx;
-			rys = ry * ry;
-		}
-
-		final float R = FloatMath.sqrt((rxs * rys - rxs * y1ts - rys * x1ts) / (rxs * y1ts + rys * x1ts)) * ((largeArc == sweepArc) ? -1 : 1);
-		final float cxt = R * rx * y1t / ry;
-		final float cyt = -R * ry * x1t / rx;
-		final float cx = ct * cxt - st * cyt + (lastX + x) / 2;
-		final float cy = st * cxt + ct * cyt + (lastY + y) / 2;
-
-		final float th1 = angle(1, 0, (x1t - cxt) / rx, (y1t - cyt) / ry);
-		float dth = angle((x1t - cxt) / rx, (y1t - cyt) / ry, (-x1t - cxt) / rx, (-y1t - cyt) / ry);
-
-		if (sweepArc == 0 && dth > 0)
-		{
-			dth -= 360;
-		}
-		else if (sweepArc != 0 && dth < 0)
-		{
-			dth += 360;
-		}
-
-		// draw
-		if ((theta % 360) == 0)
-		{
-			// no rotate and translate need
-			arcRectf.set(cx - rx, cy - ry, cx + rx, cy + ry);
-			p.arcTo(arcRectf, th1, dth);
-		}
-		else
-		{
-			// this is the hard and slow part :-)
-			arcRectf.set(-rx, -ry, rx, ry);
-
-			arcMatrix.reset();
-			arcMatrix.postRotate(theta);
-			arcMatrix.postTranslate(cx, cy);
-			arcMatrix.invert(arcMatrix2);
-
-			p.transform(arcMatrix2);
-			p.arcTo(arcRectf, th1, dth);
-			p.transform(arcMatrix);
-		}
-	}
-
-	private static NumberParse getNumberParseAttr(String name, Attributes attributes)
-	{
-		int n = attributes.getLength();
-		for (int i = 0; i < n; i++)
-		{
-			if (attributes.getLocalName(i).equals(name))
-			{
-				return parseNumbers(attributes.getValue(i));
-			}
-		}
-		return null;
-	}
-
-	private static String getStringAttr(String name, Attributes attributes)
-	{
-		int n = attributes.getLength();
-		for (int i = 0; i < n; i++)
-		{
-			if (attributes.getLocalName(i).equals(name))
-			{
-				return attributes.getValue(i);
-			}
-		}
-		return null;
-	}
-
-	private static Float getFloatAttr(String name, Attributes attributes)
-	{
-		return getFloatAttr(name, attributes, null);
-	}
-
-	private static Float getFloatAttr(String name, Attributes attributes, Float defaultValue)
-	{
-		String v = getStringAttr(name, attributes);
-		return parseFloatValue(v, defaultValue);
-	}
-
-	private static float getFloatAttr(String name, Attributes attributes, float defaultValue)
-	{
-		String v = getStringAttr(name, attributes);
-		return parseFloatValue(v, defaultValue);
-	}
-
-	private static Float parseFloatValue(String str, Float defaultValue)
-	{
-		if (str == null)
-		{
-			return defaultValue;
-		}
-		else if (str.endsWith("px"))
-		{
-			str = str.substring(0, str.length() - 2);
-		}
-		else if (str.endsWith("%"))
-		{
-			str = str.substring(0, str.length() - 1);
-			return Float.parseFloat(str) / 100;
-		}
-		// Log.d(TAG, "Float parsing '" + name + "=" + v + "'");
-		return Float.parseFloat(str);
-	}
-
-	private static class NumberParse
-	{
-		private ArrayList<Float> numbers;
-		private int nextCmd;
-
-		public NumberParse(ArrayList<Float> numbers, int nextCmd)
-		{
-			this.numbers = numbers;
-			this.nextCmd = nextCmd;
-		}
-
-		public int getNextCmd()
-		{
-			return nextCmd;
-		}
-
-		public float getNumber(int index)
-		{
-			return numbers.get(index);
-		}
-
-	}
-
-	private static class Gradient
-	{
-		String id;
-		String xlink;
-		boolean isLinear;
-		float x1, y1, x2, y2;
-		float x, y, radius;
-		ArrayList<Float> positions = new ArrayList<Float>();
-		ArrayList<Integer> colors = new ArrayList<Integer>();
-		Matrix matrix = null;
-		public Shader shader = null;
-		public boolean boundingBox = false;
-		public TileMode tilemode;
-
-		public Gradient createChild(Gradient g)
-		{
-			Gradient child = new Gradient();
-			child.id = g.id;
-			child.xlink = id;
-			child.isLinear = g.isLinear;
-			child.x1 = g.x1;
-			child.x2 = g.x2;
-			child.y1 = g.y1;
-			child.y2 = g.y2;
-			child.x = g.x;
-			child.y = g.y;
-			child.radius = g.radius;
-			child.positions = positions;
-			child.colors = colors;
-			child.matrix = matrix;
-			if (g.matrix != null)
-			{
-				if (matrix == null)
-				{
-					child.matrix = g.matrix;
-				}
-				else
-				{
-					Matrix m = new Matrix(matrix);
-					m.preConcat(g.matrix);
-					child.matrix = m;
-				}
-			}
-			child.boundingBox = g.boundingBox;
-			child.shader = g.shader;
-			child.tilemode = g.tilemode;
-			return child;
-		}
-	}
-
-	private static class StyleSet
-	{
-		HashMap<String, String> styleMap = new HashMap<String, String>();
-
-		private StyleSet(String string)
-		{
-			String[] styles = string.split(";");
-			for (String s : styles)
-			{
-				String[] style = s.split(":");
-				if (style.length == 2)
-				{
-					styleMap.put(style[0], style[1]);
-				}
-			}
-		}
-
-		public String getStyle(String name)
-		{
-			return styleMap.get(name);
-		}
-	}
-
-	private static class Properties
-	{
-		StyleSet styles = null;
-		Attributes atts;
-
-		private Properties(Attributes atts)
-		{
-			this.atts = atts;
-			String styleAttr = getStringAttr("style", atts);
-			if (styleAttr != null)
-			{
-				styles = new StyleSet(styleAttr);
-			}
-		}
-
-		public String getAttr(String name)
-		{
-			String v = null;
-			if (styles != null)
-			{
-				v = styles.getStyle(name);
-			}
-			if (v == null)
-			{
-				v = getStringAttr(name, atts);
-			}
-			return v;
-		}
-
-		public String getString(String name)
-		{
-			return getAttr(name);
-		}
-
-		private Integer rgb(int r, int g, int b)
-		{
-			return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
-		}
-
-		private int parseNum(String v) throws NumberFormatException
-		{
-			if (v.endsWith("%"))
-			{
-				v = v.substring(0, v.length() - 1);
-				return Math.round(Float.parseFloat(v) / 100 * 255);
-			}
-			return Integer.parseInt(v);
-		}
-
-		public Integer getColor(String name)
-		{
-			String v = getAttr(name);
-			if (v == null)
-			{
-				return null;
-			}
-			else if (v.startsWith("#"))
-			{
-				try
-				{
-					int c = Integer.parseInt(v.substring(1), 16);
-					return v.length() == 4 ? hex3Tohex6(c) : c;
-				}
-				catch (NumberFormatException nfe)
-				{
-					return null;
-				}
-			}
-			else if (v.startsWith("rgb(") && v.endsWith(")"))
-			{
-				String values[] = v.substring(4, v.length() - 1).split(",");
-				try
-				{
-					return rgb(parseNum(values[0]), parseNum(values[1]), parseNum(values[2]));
-				}
-				catch (NumberFormatException nfe)
-				{
-					return null;
-				}
-				catch (ArrayIndexOutOfBoundsException e)
-				{
-					return null;
-				}
-			}
-			else
-			{
-				return SVGColors.mapColour(v);
-			}
-		}
-
-		// convert 0xRGB into 0xRRGGBB
-		private int hex3Tohex6(int x)
-		{
-			return (x & 0xF00) << 8 | (x & 0xF00) << 12 | (x & 0xF0) << 4 | (x & 0xF0) << 8 | (x & 0xF) << 4 | (x & 0xF);
-		}
-
-		public float getFloat(String name, float defaultValue)
-		{
-			String v = getAttr(name);
-			if (v == null)
-			{
-				return defaultValue;
-			}
-			else
-			{
-				try
-				{
-					return Float.parseFloat(v);
-				}
-				catch (NumberFormatException nfe)
-				{
-					return defaultValue;
-				}
-			}
-		}
-
-		public Float getFloat(String name, Float defaultValue)
-		{
-			String v = getAttr(name);
-			if (v == null)
-			{
-				return defaultValue;
-			}
-			else
-			{
-				try
-				{
-					return Float.parseFloat(v);
-				}
-				catch (NumberFormatException nfe)
-				{
-					return defaultValue;
-				}
-			}
-		}
-
-		public Float getFloat(String name)
-		{
-			return getFloat(name, null);
-		}
-	}
-
-	private static class LayerAttributes
-	{
-		public final float opacity;
-
-		public LayerAttributes(float opacity)
-		{
-			this.opacity = opacity;
-		}
-	}
-
 	static class SVGHandler extends DefaultHandler
 	{
 
@@ -1505,8 +1100,8 @@ public class SVGParser
 						Float y2 = parseFloatValue(dims[3], null);
 						if (x1 != null && x2 != null && y1 != null && y2 != null)
 						{
-							float width = FloatMath.ceil(x2 - x1);
-							float height = FloatMath.ceil(y2 - y1);
+							float width = (float) Math.ceil(x2 - x1);
+							float height = (float) Math.ceil(y2 - y1);
 							canvas = picture.beginRecording((int) width, (int) height);
 							canvasRestoreCount = canvas.save();
 							canvas.clipRect(0f, 0f, width, height);
@@ -1519,8 +1114,8 @@ public class SVGParser
 				// No viewbox
 				if (canvas == null)
 				{
-					int width = (int) FloatMath.ceil(getFloatAttr("width", atts));
-					int height = (int) FloatMath.ceil(getFloatAttr("height", atts));
+					int width = (int) (float) Math.ceil(getFloatAttr("width", atts));
+					int height = (int) (float) Math.ceil(getFloatAttr("height", atts));
 					canvas = picture.beginRecording(width, height);
 					canvasRestoreCount = null;
 				}
@@ -1864,6 +1459,343 @@ public class SVGParser
 					layerAttributeStack.removeLast();
 				}
 			}
+		}
+	}
+
+	private static NumberParse getNumberParseAttr(String name, Attributes attributes) {
+		int n = attributes.getLength();
+		for (int i = 0; i < n; i++) {
+			if (attributes.getLocalName(i).equals(name)) {
+				return parseNumbers(attributes.getValue(i));
+			}
+		}
+		return null;
+	}
+
+	private static String getStringAttr(String name, Attributes attributes) {
+		int n = attributes.getLength();
+		for (int i = 0; i < n; i++) {
+			if (attributes.getLocalName(i).equals(name)) {
+				return attributes.getValue(i);
+			}
+		}
+		return null;
+	}
+
+	private static Float getFloatAttr(String name, Attributes attributes) {
+		return getFloatAttr(name, attributes, null);
+	}
+
+	private static Float getFloatAttr(String name, Attributes attributes, Float defaultValue) {
+		String v = getStringAttr(name, attributes);
+		return parseFloatValue(v, defaultValue);
+	}
+
+	private static float getFloatAttr(String name, Attributes attributes, float defaultValue) {
+		String v = getStringAttr(name, attributes);
+		return parseFloatValue(v, defaultValue);
+	}
+
+	private static Float parseFloatValue(String str, Float defaultValue) {
+		if (str == null) {
+			return defaultValue;
+		} else if (str.endsWith("px")) {
+			str = str.substring(0, str.length() - 2);
+		} else if (str.endsWith("%")) {
+			str = str.substring(0, str.length() - 1);
+			return Float.parseFloat(str) / 100;
+		}
+		// Log.d(TAG, "Float parsing '" + name + "=" + v + "'");
+		return Float.parseFloat(str);
+	}
+
+	private static class NumberParse {
+
+		private ArrayList<Float> numbers;
+
+		private int nextCmd;
+
+		public NumberParse(ArrayList<Float> numbers, int nextCmd) {
+			this.numbers = numbers;
+			this.nextCmd = nextCmd;
+		}
+
+		public int getNextCmd() {
+			return nextCmd;
+		}
+
+		public float getNumber(int index) {
+			return numbers.get(index);
+		}
+
+	}
+
+	private static class Gradient {
+
+		String id;
+
+		String xlink;
+
+		boolean isLinear;
+
+		float x1, y1, x2, y2;
+
+		float x, y, radius;
+
+		ArrayList<Float> positions = new ArrayList<Float>();
+
+		ArrayList<Integer> colors = new ArrayList<Integer>();
+
+		Matrix matrix = null;
+
+		public Shader shader = null;
+
+		public boolean boundingBox = false;
+
+		public TileMode tilemode;
+
+		public Gradient createChild(Gradient g) {
+			Gradient child = new Gradient();
+			child.id = g.id;
+			child.xlink = id;
+			child.isLinear = g.isLinear;
+			child.x1 = g.x1;
+			child.x2 = g.x2;
+			child.y1 = g.y1;
+			child.y2 = g.y2;
+			child.x = g.x;
+			child.y = g.y;
+			child.radius = g.radius;
+			child.positions = positions;
+			child.colors = colors;
+			child.matrix = matrix;
+			if (g.matrix != null) {
+				if (matrix == null) {
+					child.matrix = g.matrix;
+				} else {
+					Matrix m = new Matrix(matrix);
+					m.preConcat(g.matrix);
+					child.matrix = m;
+				}
+			}
+			child.boundingBox = g.boundingBox;
+			child.shader = g.shader;
+			child.tilemode = g.tilemode;
+			return child;
+		}
+	}
+
+	private static class StyleSet {
+
+		HashMap<String, String> styleMap = new HashMap<String, String>();
+
+		private StyleSet(String string) {
+			String[] styles = string.split(";");
+			for (String s : styles) {
+				String[] style = s.split(":");
+				if (style.length == 2) {
+					styleMap.put(style[0], style[1]);
+				}
+			}
+		}
+
+		public String getStyle(String name) {
+			return styleMap.get(name);
+		}
+	}
+
+	private static class Properties {
+
+		StyleSet styles = null;
+
+		Attributes atts;
+
+		private Properties(Attributes atts) {
+			this.atts = atts;
+			String styleAttr = getStringAttr("style", atts);
+			if (styleAttr != null) {
+				styles = new StyleSet(styleAttr);
+			}
+		}
+
+		public String getAttr(String name) {
+			String v = null;
+			if (styles != null) {
+				v = styles.getStyle(name);
+			}
+			if (v == null) {
+				v = getStringAttr(name, atts);
+			}
+			return v;
+		}
+
+		public String getString(String name) {
+			return getAttr(name);
+		}
+
+		private Integer rgb(int r, int g, int b) {
+			return ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+		}
+
+		private int parseNum(String v) throws NumberFormatException {
+			if (v.endsWith("%")) {
+				v = v.substring(0, v.length() - 1);
+				return Math.round(Float.parseFloat(v) / 100 * 255);
+			}
+			return Integer.parseInt(v);
+		}
+
+		public Integer getColor(String name) {
+			String v = getAttr(name);
+			if (v == null) {
+				return null;
+			} else if (v.startsWith("#")) {
+				try {
+					int c = Integer.parseInt(v.substring(1), 16);
+					return v.length() == 4 ? hex3Tohex6(c) : c;
+				} catch (NumberFormatException nfe) {
+					return null;
+				}
+			} else if (v.startsWith("rgb(") && v.endsWith(")")) {
+				String values[] = v.substring(4, v.length() - 1).split(",");
+				try {
+					return rgb(parseNum(values[0]), parseNum(values[1]), parseNum(values[2]));
+				} catch (NumberFormatException nfe) {
+					return null;
+				} catch (ArrayIndexOutOfBoundsException e) {
+					return null;
+				}
+			} else {
+				return SVGColors.mapColour(v);
+			}
+		}
+
+		// convert 0xRGB into 0xRRGGBB
+		private int hex3Tohex6(int x) {
+			return (x & 0xF00) << 8 | (x & 0xF00) << 12 | (x & 0xF0) << 4 | (x & 0xF0) << 8 | (x & 0xF) << 4 | (x
+					& 0xF);
+		}
+
+		public float getFloat(String name, float defaultValue) {
+			String v = getAttr(name);
+			if (v == null) {
+				return defaultValue;
+			} else {
+				try {
+					return Float.parseFloat(v);
+				} catch (NumberFormatException nfe) {
+					return defaultValue;
+				}
+			}
+		}
+
+		public Float getFloat(String name, Float defaultValue) {
+			String v = getAttr(name);
+			if (v == null) {
+				return defaultValue;
+			} else {
+				try {
+					return Float.parseFloat(v);
+				} catch (NumberFormatException nfe) {
+					return defaultValue;
+				}
+			}
+		}
+
+		public Float getFloat(String name) {
+			return getFloat(name, null);
+		}
+	}
+
+	private static class LayerAttributes {
+
+		public final float opacity;
+
+		public LayerAttributes(float opacity) {
+			this.opacity = opacity;
+		}
+	}
+
+	private static void drawArc(Path p, float lastX, float lastY, float x, float y, float rx, float ry, float theta,
+			int largeArc, int sweepArc) {
+		// Log.d("drawArc", "from (" + lastX + "," + lastY + ") to (" + x + ","+
+		// y + ") r=(" + rx + "," + ry +
+		// ") theta=" + theta + " flags="+ largeArc + "," + sweepArc);
+
+		// http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
+
+		if (rx == 0 || ry == 0) {
+			p.lineTo(x, y);
+			return;
+		}
+
+		if (x == lastX && y == lastY) {
+			return; // nothing to draw
+		}
+
+		rx = Math.abs(rx);
+		ry = Math.abs(ry);
+
+		final float thrad = theta * (float) Math.PI / 180;
+		final float st = (float) Math.sin(thrad);
+		final float ct = (float) Math.cos(thrad);
+
+		final float xc = (lastX - x) / 2;
+		final float yc = (lastY - y) / 2;
+		final float x1t = ct * xc + st * yc;
+		final float y1t = -st * xc + ct * yc;
+
+		final float x1ts = x1t * x1t;
+		final float y1ts = y1t * y1t;
+		float rxs = rx * rx;
+		float rys = ry * ry;
+
+		float lambda = (x1ts / rxs + y1ts / rys) * 1.001f; // add 0.1% to be
+		// sure that no out
+		// of range occurs
+		// due to
+		// limited precision
+		if (lambda > 1) {
+			float lambdasr = (float) Math.sqrt(lambda);
+			rx *= lambdasr;
+			ry *= lambdasr;
+			rxs = rx * rx;
+			rys = ry * ry;
+		}
+
+		final float R = (float) Math.sqrt((rxs * rys - rxs * y1ts - rys * x1ts) / (rxs * y1ts + rys * x1ts)) * (
+				(largeArc == sweepArc) ? -1 : 1);
+		final float cxt = R * rx * y1t / ry;
+		final float cyt = -R * ry * x1t / rx;
+		final float cx = ct * cxt - st * cyt + (lastX + x) / 2;
+		final float cy = st * cxt + ct * cyt + (lastY + y) / 2;
+
+		final float th1 = angle(1, 0, (x1t - cxt) / rx, (y1t - cyt) / ry);
+		float dth = angle((x1t - cxt) / rx, (y1t - cyt) / ry, (-x1t - cxt) / rx, (-y1t - cyt) / ry);
+
+		if (sweepArc == 0 && dth > 0) {
+			dth -= 360;
+		} else if (sweepArc != 0 && dth < 0) {
+			dth += 360;
+		}
+
+		// draw
+		if ((theta % 360) == 0) {
+			// no rotate and translate need
+			arcRectf.set(cx - rx, cy - ry, cx + rx, cy + ry);
+			p.arcTo(arcRectf, th1, dth);
+		} else {
+			// this is the hard and slow part :-)
+			arcRectf.set(-rx, -ry, rx, ry);
+
+			arcMatrix.reset();
+			arcMatrix.postRotate(theta);
+			arcMatrix.postTranslate(cx, cy);
+			arcMatrix.invert(arcMatrix2);
+
+			p.transform(arcMatrix2);
+			p.arcTo(arcRectf, th1, dth);
+			p.transform(arcMatrix);
 		}
 	}
 }

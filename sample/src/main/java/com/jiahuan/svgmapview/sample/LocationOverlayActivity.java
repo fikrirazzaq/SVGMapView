@@ -4,18 +4,14 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.PointF;
 import android.os.Bundle;
-import android.support.v7.app.ActionBarActivity;
-
+import android.support.v7.app.AppCompatActivity;
 import com.jiahuan.svgmapview.SVGMapView;
 import com.jiahuan.svgmapview.SVGMapViewListener;
-import com.jiahuan.svgmapview.core.data.SVGPicture;
-import com.jiahuan.svgmapview.core.helper.ImageHelper;
-import com.jiahuan.svgmapview.core.helper.map.SVGBuilder;
 import com.jiahuan.svgmapview.overlay.SVGMapLocationOverlay;
 import com.jiahuan.svgmapview.sample.helper.AssetsHelper;
 
 
-public class LocationOverlayActivity extends ActionBarActivity
+public class LocationOverlayActivity extends AppCompatActivity
 {
     private SVGMapView mapView;
 

@@ -3,14 +3,12 @@ package com.jiahuan.svgmapview.sample;
 import android.graphics.Color;
 import android.graphics.PointF;
 import android.os.Bundle;
-import android.support.v7.app.ActionBarActivity;
-
+import android.support.v7.app.AppCompatActivity;
 import com.jiahuan.svgmapview.SVGMapView;
 import com.jiahuan.svgmapview.sample.helper.AssetsHelper;
-
 import java.util.Random;
 
-public class SparkActivity extends ActionBarActivity
+public class SparkActivity extends AppCompatActivity
 {
 
     private SVGMapView mapView;
